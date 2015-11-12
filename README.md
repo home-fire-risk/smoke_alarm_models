@@ -12,7 +12,7 @@ Help Red Cross Home Fire Preparedness Campaign target areas for smoke alarm inst
 
 ### How to contribute
 
-We'd like to trying using GitHub issues as a way to manage modeling progress and tasks for this project.  We intend to use "issues" liberally to include things such as exploratory analysis, modeling, research and non-coding tasks such as reaching out to our Red Cross contacts to clarify data issues when needed.
+We'd like to try using GitHub issues to manage modeling progress and tasks for this project.  We intend to use "issues" liberally to include things such as exploratory analysis, modeling, research and non-coding tasks such as reaching out to our Red Cross contacts to clarify data issues when needed.
 
   1. **Find a task:** Search the [repo issues](https://github.com/home-fire-risk/smoke_alarm_models/issues) for models that have been previously scoped with the Red Cross team and assign yourself to it.  Or start a new issue (path of analysis) if you have a modeling idea and assign yourself to it.
   2. **Code**: Create a folder within the root directory named something like "model_XXX" where _XXX is a short description of what you're working on.  We've started a couple of these already (/model_1a_RC_homevisit, for example).
