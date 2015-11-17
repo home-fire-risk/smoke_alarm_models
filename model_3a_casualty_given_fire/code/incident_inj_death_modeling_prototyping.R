@@ -1,23 +1,33 @@
-#' Clear and build workspace
+# Clear and build workspace
 rm(list = ls())
 gc()
 
+setwd("/Users/nickbecker/Documents/Github/arc_smoke_alarm")
 
 library(data.table)
 library(magrittr)
-source("code/general_purpose/unbalanced_downsample.r")
+source("models/model_3a_casualty_given_fire/code/general_purpose/unbalanced_downsample.r")
 
 library(caret)
 library(DMwR)
 library(randomForest)
 
+library(plyr)
+library(dplyr)
+#library(doMC)
 
-load("data/rdata/inc.rdata")
+# dual core
+#registerDoMC(cores = 2)
+
+
+load("data_from_david/inc.rdata")
 setkey(inc, geoid)
 inc = inc[!is.na(geoid)]
 inc[,target:="no_inj"]
 inc[oth_inj>0, target:="inj"]
 inc[oth_death>0, target:="death"]
+
+head(inc)
 
 if(FALSE){
   inc[,geoid2:=geoid]
@@ -34,12 +44,12 @@ if(FALSE){
   # 0.002629008 0.013785997 0.983584994 
 }
 
-load("data/rdata/tract_data.Rdata") # sl - 74101 obs, 270 vars
+load("data_from_david/tract_data.Rdata") # sl - 74101 obs, 270 vars
 sl = data.table(sl)
 setnames(sl, names(sl), tolower(names(sl)))
 sl = sl[!is.na(geoid)]
 
-
+head(sl)
 #############################################
 # Let's develop a single modeling iteration #
 #############################################
@@ -102,7 +112,7 @@ train = train[,-drop_ix2, with=FALSE]
 ###############################
 train[,populationdensitypersquaremile20:=gsub(",","",populationdensitypersquaremile20)]
 train[,populationdensitypersquaremile20:=gsub('"','',populationdensitypersquaremile20)]
-sl2[populationdensitypersquaremile20==".", populationdensitypersquaremile20:=NA]
+train[populationdensitypersquaremile20==".", populationdensitypersquaremile20:=NA]
 train[,populationdensitypersquaremile20:=as.numeric(populationdensitypersquaremile20)]
 
 train[,tractpopulation2010:=gsub(",","",tractpopulation2010)]
@@ -120,6 +130,12 @@ train[,landareasquaremiles2010:=as.numeric(landareasquaremiles2010)]
 gc()
 
 
+# Testing for low variance variables
+nzv = nearZeroVar(train)
+nzv
+colnames(train)[nzv]
+
+train = train[, -nzv, with = FALSE]
 
 #######################
 # Handle missing data #
@@ -178,14 +194,16 @@ table(train$target)
 system.time(
   mod_casualty_rf <- randomForest(x=train_centrImp[,-"target", with=FALSE], 
                                  y=train_centrImp[,as.factor(target=="no_inj")], 
-                                 ntree=400,
+                                 ntree=150,
                                  #mtry=10
   )
 )
+
 # 12.18  seconds for 10 trees (mtry=10). Yikes.
 # 23.27  seconds for 20 trees (mtry=10). Linear growth
 # 476.14 seconds for 400 trees (mtry=14(def))
 ## NB: this is overfitting on a single downsampling iteration.
+mod_casualty_rf
 importance(mod_casualty_rf)
 
 # 99% accuracy on training data.
@@ -193,6 +211,11 @@ table(predict(mod_casualty_rf, train_centrImp),
       train_centrImp$target=="no_inj") / nrow(train_centrImp)
 table(predict(mod_casualty_rf, train), 
       train_centrImp$target=="no_inj") / nrow(train_centrImp)
+
+
+mod_caus_rf_preds = predict(mod_casualty_rf, train_centrImp)
+confusionMatrix(mod_caus_rf_preds, train_centrImp$target=="no_inj")
+
 
 save(mod_casualty_rf, file="models/mod_casualty_rf_prototype.Rdata")
 ##################################################################3
@@ -235,4 +258,146 @@ system.time(
 #   )
 # )
 
-# Should probab
+# Should probably
+
+
+
+
+
+
+
+
+#### Becker Model Tuning Updates ####
+
+
+
+# convert to data frame (no need for this, I'm just more familiar with dplyr than data.table)
+train_centrImp_df = as.data.frame(train_centrImp)
+train_centrImp_df = mutate(train_centrImp_df,
+                           target = as.factor(target))
+
+colnames(train_centrImp_df)
+train_centrImp_df[1:3,]
+
+# Split into training and validation set
+set.seed(12)
+inTrain = createDataPartition(y = train_centrImp_df$target,
+                              p = 0.8,
+                              list = FALSE)
+training_df = train_centrImp_df[inTrain,]
+validation_df = train_centrImp_df[-inTrain,]
+
+which(colnames(training_df) == "target") # 184
+
+# model parameter grid search
+fitControl = trainControl(method = "cv", number = 2,
+                          verboseIter = TRUE) # 2-fold CV (for saving time)
+noneControl = trainControl(method = "none") # for a single iteration (must specify individual grid parameters)
+
+
+gbmGrid = expand.grid(interaction.depth = c(1:4),
+                      n.trees = 300,
+                      shrinkage = 0.1,
+                      n.minobsinnode = c(10,20))
+rfGrid = expand.grid(mtry = c(8:14))
+
+
+# Let's test some simple models
+
+# Gradient Boosting
+fit1 = train(x=training_df[, -184],
+             y=training_df[, 184],
+             method = "gbm",
+             trControl = fitControl,
+             #trControl = noneControl,
+             tuneGrid = gbmGrid,
+             verbose = TRUE)
+fit1
+
+gbm_pred <- predict(fit1, validation_df[,-184])
+confusionMatrix(gbm_pred, validation_df$target)
+
+
+
+# Random Forest
+fit2 <- randomForest(x=training_df[, -184],
+                     y=training_df[, 184], 
+                                ntree=200)
+fit2
+rf_pred <- predict(fit2, validation_df[,-184])
+confusionMatrix(rf_pred, validation_df$target)
+
+
+# Random Fores (caret)
+fit3 = train(x=training_df[, -184],
+             y=training_df[, 184],
+             method = "rf",
+             trControl = fitControl,
+             #trControl = noneControl,
+             tuneGrid = rfGrid)
+fit3
+
+
+rf_caret_pred <- predict(fit3, validation_df[,-184])
+confusionMatrix(rf_caret_pred, validation_df$target)
+
+# Partial least squares
+plsFit = train(x=training_df[, -184],
+               y=training_df[, 184],
+               method = "pls",
+               trControl = fitControl,
+               #trControl = noneControl,
+               #tuneGrid = gbmGrid
+               # center and scale predictors for the training set and fuutre samples
+               preProc = c("center", "scale"))
+plsFit
+
+pls_pred <- predict(plsFit, validation_df[,-184])
+confusionMatrix(pls_pred, validation_df$target)
+
+
+# Random Forest (caret) on Kappa
+fit4 = train(x=training_df[, -184],
+             y=training_df[, 184],
+             method = "rf",
+             metric = "Kappa",
+             trControl = fitControl,
+             #trControl = noneControl,
+             tuneGrid = rfGrid)
+fit4
+
+rf_caretkappa_pred <- predict(fit4, validation_df[,-184])
+confusionMatrix(rf_caretkappa_pred, validation_df$target)
+
+
+
+nnetGrid = expand.grid(.decay = c(0.1),
+                       .size = c(1:4))
+
+# Neural Netwrk (caret)
+fit5 = train(x=training_df[, -184],
+             y=training_df[, 184],
+             method = "nnet",
+             metric = "Accuracy",
+             trControl = fitControl,
+             #trControl = noneControl,
+             tuneGrid = nnetGrid,
+             preProc = c("center", "scale"),
+             maxit = 100)
+fit5
+
+nnet_caretkappa_pred <- predict(fit5, validation_df[,-184])
+confusionMatrix(nnet_caretkappa_pred, validation_df$target)
+
+
+
+
+
+
+
+
+
+
+
+
+
