@@ -19,6 +19,8 @@ We'd like to try using GitHub issues to manage modeling progress and tasks for t
   3. **Data:** currently stored on Google Drive [here](https://drive.google.com/folderview?id=0Bxt-Sxy6HRaxZzhyeFRkUVRvckE&usp=drive_web).
   4. **Explain** Add a README.md to your modeling folder briefly explaining what you're doing, dependencies (data/tools) and a quick note about how to run your code if it's not clear.
   5. **Results**: Save your results (census tract level if possible) in a /results folder within your modeling folder as results_tract.csv with one column of predictions/risk scores and one column of corresponding 11 digit census tract codes (or appropiate geography)
+  
+ For conversations/questions that are awkward to carry out using GitHub issues, send an email to DataKind Red Cross core volunteers Andrew Brooks (andrewbrooksct@gmail.com), Xianghui Dong (dracodoc@gmail.com) and Greg Matthews (gmatthews@gmail.com) and one of us will follow up with you.
 
 ### Modeling ideas (working doc)
 Currently in [this Google Doc](https://docs.google.com/document/d/1oJN-QwLVqFHOvrRNtW2KEAkNZ-PuFiqTwa8y3iXx1Sg).  We'd like to migrate these and future ideas directly to [this repo's issues page](https://github.com/home-fire-risk/smoke_alarm_models/issues).
