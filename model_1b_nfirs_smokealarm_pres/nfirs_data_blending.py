@@ -192,12 +192,12 @@ for f in filesDict:
                                 'INC_NO', 'EXP_NO'] )
                             
     #adding couple of helpful columns
-    nfirs_geo.year = str(f)
+    nfirs_geo['year'] = f
     output_fp = 'output/nfirs_geo_%s.csv' % str(f)
     
     nfirs_geo.to_csv(output_fp, sep='\t')
 
-    nfirs_all_years.append(nfirs_geo)
+    nfirs_all_years = nfirs_all_years.append(nfirs_geo)
     
 nfirs_all_years.to_csv('output/nfirs_geo_allYears.csv', sep='\t')
 
