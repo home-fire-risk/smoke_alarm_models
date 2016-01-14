@@ -5,9 +5,9 @@
 ## libraries
 library('data.table')
 
-dt1a <- fread('models/model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
-dt1c <- fread('models/model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
-
+dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
+dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
+dt3a <- fread('model_3a_casualty_given_fire/results/results_tract.csv')
 
 #######################################
 ## Processing results from Model 1.A ##
@@ -40,19 +40,29 @@ dt1c_tract[, tract_geoid:=paste0(state, cnty, tract)]
 
 
 #######################################
+## Processing results from Model 3.A ##
+#######################################
+
+# probabilities are low, so forcing normalization of scores to be between 0 and 1.  this could be improved later per feedback from ARC
+dt3a[, risk_3a := (risk_3a - min(risk_3a))/(max(risk_3a) - min(risk_3a))]
+setnames(dt3a, 'geoid', 'tract_geoid')
+
+#######################################
 ## AGGREGATING RESULTS ################
 #######################################
 
 # setting key for merge
 setkey(dt1a, tract_geoid)
 setkey(dt1c_tract, tract_geoid)
+setkey(dt3a, tract_geoid)
 
 # merging risk scores together
 dt <- merge(dt1a[,.(tract_geoid, risk_1a)], dt1c_tract, all=T)
+dt <- merge(dt, dt3a[,.(tract_geoid, risk_3a)], all=T)
 
 # calculating aggregated risk score.  simple average now. will be built into function with ability to weight each indicator differently.
-dt$risk <- rowMeans(dt[,.(risk_1a, risk_1c)], na.rm=T)
+dt$risk <- rowMeans(dt[,.(risk_1a, risk_1c, risk_3a)], na.rm=T)
 
 ## Writing out results
-write.table(dt[,.(state, cnty, tract, tract_geoid, risk, risk_1a, risk_1c, tract_pop)], file='visualization/data/risk_tract.csv', sep=',', row.names=F)
+write.table(dt[,.(state, cnty, tract, tract_geoid, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
