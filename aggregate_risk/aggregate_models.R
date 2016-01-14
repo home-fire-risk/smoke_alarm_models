@@ -63,6 +63,9 @@ dt <- merge(dt, dt3a[,.(tract_geoid, risk_3a)], all=T)
 # calculating aggregated risk score.  simple average now. will be built into function with ability to weight each indicator differently.
 dt$risk <- rowMeans(dt[,.(risk_1a, risk_1c, risk_3a)], na.rm=T)
 
+#Creating County Average 
+dt[, risk_cnty:=mean(risk), by=.(state, cnty)]
+
 ## Writing out results
 write.table(dt[,.(state, cnty, tract, tract_geoid, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
