@@ -67,5 +67,5 @@ dt$risk <- rowMeans(dt[,.(risk_1a, risk_1c, risk_3a)], na.rm=T)
 dt[, risk_cnty:=mean(risk), by=.(state, cnty)]
 
 ## Writing out results
-write.table(dt[,.(state, cnty, tract, tract_geoid, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
+write.table(dt[,.(state, cnty, tract, tract_geoid, risk_cnty, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
