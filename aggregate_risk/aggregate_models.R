@@ -4,6 +4,7 @@
 
 ## libraries
 library('data.table')
+library('readxl') 
 
 dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
 dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
@@ -66,6 +67,29 @@ dt$risk <- rowMeans(dt[,.(risk_1a, risk_1c, risk_3a)], na.rm=T)
 #Creating County Average 
 dt[, risk_cnty:=mean(risk), by=.(state, cnty)]
 
-## Writing out results
-write.table(dt[,.(state, cnty, tract, tract_geoid, risk_cnty, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
+#######################################
+## MERGING ARC REGIONS ################
+#######################################
+
+# reading in crosswalk ARC region <=> FIPS data
+fileurl <- 'http://maps.redcross.org/website/Services/Data/2015_Chapter_Alignment_Master_No_Contacts.xlsx'
+download.file(fileurl, '2015_Chapter_Alignment_Master_No_Contacts.xlsx')
+reg <- data.table(read_excel('2015_Chapter_Alignment_Master_No_Contacts.xlsx', sheet = 'COUNTY_CHAP_NO_CONTACTS', skip = 1))
+setnames(reg, names(reg), tolower(gsub(' ', '_', names(reg))))
+
+# deduping
+reg <- reg[,head(.SD, 1), by='county_fips']
+
+# cross-walking
+dt[, county_fips:=substr(tract_geoid, 0, 5)]
+dt <- merge(dt, reg[,.(county_fips, region_code, region_name, chapter_code, chapter_name, county_name_long)], by='county_fips', all.x=T, all.y=F)
+
+# cleaing up
+file.remove('2015_Chapter_Alignment_Master_No_Contacts.xlsx') # remove file after merge, no need to keep clutter
+
+#######################################
+## WRITING OUT RESULTS ################
+#######################################
+
+write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
