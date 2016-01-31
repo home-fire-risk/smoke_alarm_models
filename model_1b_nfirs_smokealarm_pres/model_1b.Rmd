@@ -1,0 +1,188 @@
+---
+title: "model 1b smoke alarm presence"
+author: "Xianghui Dong"
+date: "2016年1月31日"
+output: html_document
+mathjax: null
+---
+
+## To Get the target variable 1b: % of fire incidents within a region that didn’t have smoke detectors
+
+[github issue](https://github.com/home-fire-risk/smoke_alarm_models/issues/12)
+[model document](https://docs.google.com/document/d/1oJN-QwLVqFHOvrRNtW2KEAkNZ-PuFiqTwa8y3iXx1Sg/edit)
+
+```
+Measure 2: model  (Jonathan / Andrew)
+target variable: % of fire incidents within a region that didn’t have smoke detectors (Xianghui create variable, push to J / A for model)
+all fire incidents in a region(tract), how many didn't have smoke detectors? 
+```
+
+By region we are refering census tract now. 
+For each tract, count
+- all structured fire incidents
+- the ratio of smoke detector presence in these incidents
+
+Refer to [My previous analysis of smoke alarm presence information in NFIRS data](AlarmPresenceNFIRS.html) for background. 
+1. Using structured fire as the most relevant approximation to home fires.
+2. The basic module `DET_ALERT` is focused on whether the smoke detectors alerted occupants, which have lots of unknowns. Structured fire module `DETECTOR` just ask whether the smoke detectors is present, in many case it's known even whether it alerted occupants is unknown.
+3. We need to further focus on smoke alarms in all possible fire detectors.
+4. In general, a big portion of all fire incidents don't have smoke alarm presence information. It need much caution before using it as a indicator.
+
+### Read data
+
+NFIRS original cdrom data in 'e:/Data/NFIRS/'
+Read original data, save as R data object.
+```{r Read NFIRS data}
+# ---- basic incident ----
+#data_year = 2013
+save_csv_basic = function(data_year){
+  basic_file = paste0('e:/Data/NFIRS/', data_year, '/', data_year,'basicincident.txt')
+  basic_incident = fread(basic_file, sep = '^', header = TRUE,
+                  stringsAsFactors=FALSE, verbose = TRUE,
+                  colClasses=list(character=c("INC_DATE", "ALARM", "ARRIVAL", "INC_CONT", "LU_CLEAR")))
+  setkey(basic_incident, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+  saveRDS(basic_incident, paste0('e:/data/NFIRS/', data_year, 'basicincident.rds'))
+}
+save_csv_basic(2012)
+save_csv_basic(2013)
+#data_year = 2011
+save_dbf_basic = function(data_year){
+  basic_file = paste0('e:/Data/NFIRS/', data_year, '/', data_year,'basicincident.dbf')
+  basic_incident = data.table(read.dbf(basic_file, as.is = TRUE))
+  setkey(basic_incident, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+  saveRDS(basic_incident, paste0('e:/data/NFIRS/', data_year, 'basicincident.rds'))
+}
+save_dbf_basic(2009)
+save_dbf_basic(2010)
+save_dbf_basic(2011)
+# ---- fire incident ----
+# data_year = 2013
+save_csv_fire = function(data_year){
+  fire_file = paste0('e:/Data/NFIRS/', data_year, '/', data_year,'fireincident.txt')
+  fire_incident = fread(fire_file, sep = '^', header = TRUE,
+                    stringsAsFactors=FALSE, verbose = TRUE, colClasses=list(character=c("INC_DATE")))
+  setkey(fire_incident, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+  saveRDS(fire_incident, paste0('e:/data/NFIRS/', data_year, 'fireincident.rds'))
+}
+save_csv_fire(2012)
+save_csv_fire(2013)
+# data_year = 2011
+save_dbf_fire = function(data_year){
+  fire_file = paste0('e:/Data/NFIRS/', data_year, '/', data_year,'fireincident.dbf')
+  fire_incident = data.table(read.dbf(fire_file, as.is = TRUE))
+  setkey(fire_incident, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+  saveRDS(fire_incident, paste0('e:/data/NFIRS/', data_year, 'fireincident.rds'))
+}
+save_dbf_fire(2009)
+save_dbf_fire(2010)
+save_dbf_fire(2011)
+```
+
+### Calculate target variables
+
+Geocoded incident address and the original addresses were loaded from R data object saved before.
+
+```{r variable of percentage of fire that no smoke detectors}
+# read original data, geocoding result. 
+data_year = '2010'
+load(paste0('data/address/', data_year, '_formated_addresses.Rdata')) # variable name: address, 21 columns
+load(paste0('data/address/', data_year, '_geocoded_addresses.Rdata')) # variable name: geocoded_address, 13 columns for 2012
+setkey(address, row_seq) # csv sorted, Rdata not sorted.
+table(address$address_type)
+# load basic and fire incident file of data_year, get incident type, link to row_seq, get location
+basic_incident = readRDS(paste0('e:/data/NFIRS/', data_year, 'basicincident.rds'))
+fire_incident = readRDS(paste0('e:/data/NFIRS/', data_year, 'fireincident.rds'))
+# 2013: basic - 2,003,907 fire - 554,671 building_fire - 259,732
+building_fire = fire_incident[basic_incident[grep('111', INC_TYPE)]]
+# N for no detectors, note this is different from no smoke alarms.
+table(building_fire$DETECTOR, useNA = "always")
+# further break down on detector type. 
+# 2, 4, 0 have detector but not smoke alarms. this and code N together count as "no smoke alarm"
+# 1, 5 should indicate have smoke alarm present
+table(building_fire$DET_TYPE, useNA = "always")
+building_fire[, smoke_alarm_presence := NA]
+building_fire[DETECTOR == 'N', smoke_alarm_presence := FALSE]
+building_fire[DET_TYPE %in% c("2", "4", "0"), smoke_alarm_presence := FALSE]
+building_fire[DET_TYPE %in% c("1", "5"), smoke_alarm_presence := TRUE]
+table(building_fire$smoke_alarm_presence,useNA = "always")
+# too many columns in building_fire. if we pick columns later, the data year difference in building_fire could cause problems for numbered column referencing. Better pick columns now, and merge geocode result later, no need to pick later.
+building_fire_smoke = building_fire[, .(STATE, FDID, INC_DATE, INC_NO, EXP_NO, smoke_alarm_presence)]
+# for each tract, get T/F/NA ratio, total count
+# merge with geocoded addresses
+setkey(address, row_seq)
+setkey(geocoded_address, row_seq)
+address_merged = merge(address, geocoded_address) 
+# checking rating value and accuracy of geocoding
+# View(address_merged[rating > 60 & rating < 70][sample(.N, 100)])
+# View(address_merged[rating > 40 & rating < 50][sample(.N, 100)])
+# View(address_merged[rating > 30 & rating < 40][sample(.N, 100)])
+# View(address_merged[rating > 20 & rating < 30][sample(.N, 100)])
+# View(address_merged[rating > 10 & rating < 20][sample(.N, 100)])
+address_merged[rating >= 0 & rating < 30, .N] / address_merged[, .N]
+address_merged[rating >= 0 & rating < 20, .N] / address_merged[, .N]
+# some address have empty output for tabblock matching, census website with current data have internal error for them too.
+good_address_merged = address_merged[rating >= 0 & rating < 21 & tractid != '', ]
+# rating < 20, 74% in total are very good results. 
+setkey(good_address_merged, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+building_fire_smoke_geocoded = merge(building_fire_smoke, good_address_merged)
+# col number depend on data structure, not a good method.
+# smoke_alarm_presence is what we want, came from the newly added last column of building_fire, i.e. 117th column
+# count all fire, alarm presented, not presented, Not Known for each tract
+building_fire_smoke_geocoded[, c('all_fire', 'alarm_presented') 
+                                      := list(.N, sum(smoke_alarm_presence, na.rm = TRUE)), 
+                                      by = tractid]
+all_fire = building_fire_smoke_geocoded[, .N, by = tractid]
+setnames(all_fire, 'N', 'all_fire')
+alarm_presented = building_fire_smoke_geocoded[, 
+                                               sum(smoke_alarm_presence, na.rm = TRUE),
+                                               by = tractid]
+setnames(alarm_presented, 'V1', 'alarm_presented')
+alarm_not_presented = building_fire_smoke_geocoded[, 
+                                                        length(smoke_alarm_presence[which(smoke_alarm_presence == FALSE)]), 
+                                                        by = tractid]
+setnames(alarm_not_presented, 'V1', 'alarm_not_presented')
+alarm_unknown = building_fire_smoke_geocoded[, 
+                                                      length(smoke_alarm_presence[which(is.na(smoke_alarm_presence))]),
+                                                      by = tractid]
+setnames(alarm_unknown, 'V1', 'alarm_unknown')
+setkey(all_fire, tractid)
+setkey(alarm_presented, tractid)
+setkey(alarm_not_presented, tractid)
+setkey(alarm_unknown, tractid)
+alarm_presence_by_tract = merge(all_fire, alarm_unknown)
+alarm_presence_by_tract = merge(alarm_presence_by_tract, alarm_presented)
+alarm_presence_by_tract = merge(alarm_presence_by_tract, alarm_not_presented)
+saveRDS(alarm_presence_by_tract, file = paste0('results/', data_year, '_alarm_presence_by_tract.rds'))
+```
+
+### combine multiple years statistics
+```{r combine multiple years statistics}
+alarm_presence_years = list()
+for(data_year in 2009:2013){
+  current = readRDS(paste0('results/', data_year, '_alarm_presence_by_tract.rds'))
+  current[, ratio_no_alarm_in_all := alarm_not_presented / all_fire]
+  current[, ratio_no_alarm_in_all_known := 
+            alarm_not_presented / (alarm_presented + alarm_not_presented)]
+  alarm_presence_years[[toString(data_year)]] = current
+  write.csv(alarm_presence_years[[toString(data_year)]], 
+            paste0('results/', data_year, '_alarm_presence_by_tract.csv'),
+            quote = TRUE)
+}
+alarm_presence_2009_2013 = rbindlist(alarm_presence_years)
+alarm_presence_2009_2013[, c('all_fire_all_years', 'alarm_unknown_all_years',
+                             'alarm_presented_all_years',
+                             'alarm_not_presented_all_years') := 
+                           list(sum(all_fire), sum(alarm_unknown),
+                                sum(alarm_presented), sum(alarm_not_presented)), 
+                         by = tractid]
+alarm_presence_all = alarm_presence_2009_2013[,c(1, 8:11), with = FALSE]
+setkey(alarm_presence_all, tractid)
+alarm_presence_all = unique(alarm_presence_all)
+alarm_presence_all[, ratio_no_alarm_in_all := 
+                     alarm_not_presented_all_years / all_fire_all_years]
+alarm_presence_all[, ratio_no_alarm_in_all_known := 
+          alarm_not_presented_all_years / 
+            (alarm_presented_all_years + alarm_not_presented_all_years)]
+write.csv(alarm_presence_all, 'results/2009_2013_alarm_presence_by_tract.csv',
+            quote = TRUE)
+```
