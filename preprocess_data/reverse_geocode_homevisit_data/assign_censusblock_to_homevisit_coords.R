@@ -8,15 +8,16 @@
 
 library('foreach')
 library('doMC')
+library('data.table')
 
 # this the function that gets the block group for a pair of coordinates from the FCC API.
 source('functions/coord_to_censusblock.R')
 
 # setting directories
-basedata_dir <- '/Users/ajb/Google Drive/Red Cross/smokealarm/data/RedCross/hfp_homevisits/' # google drive dir, or wherever the data lives
+basedata_dir <- '/Users/ajb/Google Drive/Red Cross/smokealarm/data/RedCross/hfp_homevisits' # google drive dir, or wherever the data lives
 outdata_dir <- '/Users/ajb/Documents/redcross_hfp_geocoded' # where will the data be outputted.  Not dumping directly to Google Drive bc it messes up with the syncing
 
-dt <- fread(sprintf('%s/HFC_Dupe_Check_Oct2014_Sept2015_Geocode.csv', basedata_dir), colClasses = c('Latitude'='character', 'Longitude'='character'))
+dt <- fread(sprintf('%s/HFC_Dupe_Check_Oct2014_Sept2015_Geocode_bg.csv', basedata_dir), colClasses = c('Latitude'='character', 'Longitude'='character'))
 dt$id <- 1:nrow(dt) # assign id to each visit. necessary for merging back to 
 
 ########################
