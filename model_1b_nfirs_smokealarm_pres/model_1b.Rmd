@@ -6,10 +6,10 @@ output: html_document
 mathjax: null
 ---
 
-## To Get the target variable 1b: % of fire incidents within a region that didn’t have smoke detectors
+## Target variable 1b: % of fire incidents within a region that didn’t have smoke detectors
 
-[github issue](https://github.com/home-fire-risk/smoke_alarm_models/issues/12)
-[model document](https://docs.google.com/document/d/1oJN-QwLVqFHOvrRNtW2KEAkNZ-PuFiqTwa8y3iXx1Sg/edit)
+- [github issue](https://github.com/home-fire-risk/smoke_alarm_models/issues/12)
+- [model document](https://docs.google.com/document/d/1oJN-QwLVqFHOvrRNtW2KEAkNZ-PuFiqTwa8y3iXx1Sg/edit)
 
 ```
 Measure 2: model  (Jonathan / Andrew)
@@ -23,16 +23,19 @@ For each tract, count
 - the ratio of smoke detector presence in these incidents
 
 Refer to [My previous analysis of smoke alarm presence information in NFIRS data](AlarmPresenceNFIRS.html) for background. 
+
 1. Using structured fire as the most relevant approximation to home fires.
 2. The basic module `DET_ALERT` is focused on whether the smoke detectors alerted occupants, which have lots of unknowns. Structured fire module `DETECTOR` just ask whether the smoke detectors is present, in many case it's known even whether it alerted occupants is unknown.
 3. We need to further focus on smoke alarms in all possible fire detectors.
 4. In general, a big portion of all fire incidents don't have smoke alarm presence information. It need much caution before using it as a indicator.
 
-### Read data
+### Read original data, save as R data object.
 
 NFIRS original cdrom data in 'e:/Data/NFIRS/'
-Read original data, save as R data object.
+
 ```{r Read NFIRS data}
+library(data.table)
+library(bit64)
 # ---- basic incident ----
 #data_year = 2013
 save_csv_basic = function(data_year){
@@ -81,6 +84,8 @@ save_dbf_fire(2011)
 ### Calculate target variables
 
 Geocoded incident address and the original addresses were loaded from R data object saved before.
+
+This code chunk will process one year data. By changing data_year value and run it again, we got 5 years results. I didn't put them into a function because this is easier to test and explore.
 
 ```{r variable of percentage of fire that no smoke detectors}
 # read original data, geocoding result. 
