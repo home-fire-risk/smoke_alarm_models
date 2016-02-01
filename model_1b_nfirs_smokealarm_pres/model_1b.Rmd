@@ -22,7 +22,7 @@ For each tract, count
 - all structured fire incidents
 - the ratio of smoke detector presence in these incidents
 
-Refer to [My previous analysis of smoke alarm presence information in NFIRS data](AlarmPresenceNFIRS.html) for background. 
+Refer to [My previous analysis of smoke alarm presence information in NFIRS data](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_1b_nfirs_smokealarm_pres/AlarmPresenceNFIRS.html) for background. 
 
 1. Using structured fire as the most relevant approximation to home fires.
 2. The basic module `DET_ALERT` is focused on whether the smoke detectors alerted occupants, which have lots of unknowns. Structured fire module `DETECTOR` just ask whether the smoke detectors is present, in many case it's known even whether it alerted occupants is unknown.
