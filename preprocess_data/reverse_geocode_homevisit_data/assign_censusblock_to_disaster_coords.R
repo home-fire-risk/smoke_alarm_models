@@ -2,52 +2,50 @@
 # Author: Margaret Furr
 # Date: 1/31/2016
 # Purpose: Getting tracts for coordinate pairs to prepare for calculating a risk indicator
-# Note: some code being used is coming from assign_censusblock_to_homevisit_coords.R
 
-# foreach and doMC libraries
-library('foreach')
-library('doMC')
+# libraries
+library('XML')
+library('httr')
+library('base')
+library('rjson')
 
 # read data from 2009-2014_RedCross_DisasterCases_sample.csv
-redcross_disaster_cases <- read.csv("2009-2014_RedCross_DisasterCases_sample.csv",header=TRUE)
-
-# out data dir
-outdata_dir = 'Users/margaret/Desktop'
-
-# lat/lon coordinates = esri_latitude_x and esri_longitude_x 
-redcross_disaster_cases$esri_latitude_x[1:5]
-redcross_disaster_cases$esri_longitude_x[1:5]
+redcross_disaster_cases <- read.csv("2009-2014_RedCross_DisasterCases_sample.csv",header=TRUE,na=NA)
+#redcross_disaster_cases <- read.csv("/Users/abrooks/Google Drive/Red Cross/smokealarm/data/RedCross/redcross_disaster_cases/2009-2014_RedCross_DisasterCases_sample.csv",header=TRUE)
 
 # home fire cases
-redcross_homefire_cases <- redcross_disaster_cases[redcross_disaster_cases$event_type_new_categories == "Fire",]
-redcross_homefire_cases$event_type_old_categories
+redcross_homefire_cases <- redcross_disaster_cases[redcross_disaster_cases$event_type_old_categories == "Fire : Multi-Family" | redcross_disaster_cases$event_type_old_categories == "Fire : Single Family" | redcross_disaster_cases$event_type_old_categories == "Fire",]
 
-# this the function that gets the block group for a pair of coordinates from the FCC API.
-source('coord_to_censusblock.R')
+# lat/lon coordinates = esri_latitude_x and esri_longitude_x 
+redcross_homefire_cases$esri_latitude_x[1:5]
+redcross_homefire_cases$esri_longitude_x[1:5]
 
-# Note: code being used is coming from assign_censusblock_to_homevisit_coords.R
-# parallel process with foreach to get block groups for pairs of coordinates from FCC API
-ids <- split(1:nrow(redcross_disaster_cases), cut(1:nrow(redcross_disaster_cases), 50, labels=FALSE))
-registerDoMC(cores=10) # i have 4 cores on my macbook... but increasing beyond 4 seems to work
-Sys.time()
-ids <- split(1:nrow(redcross_disaster_cases), cut(1:nrow(redcross_disaster_cases), 50, labels=FALSE)) # real deal
-#ids <- split(1:120, cut(1:120, 20, labels=FALSE)) # testing
-system.time(
-  foreach(i=ids) %dopar%
-    coord_to_censusblock(redcross_disaster_cases$esri_latitude_x, redcross_disaster_cases$esri_longitude_x, id=i, out=sprintf('%s/geocodes_%s_%s.csv', outdata_dir, min(i), max(i)))
-)
-Sys.time()
+# census tract
+redcross_homefire_cases$census_tract <- c()
+# urls
+urls <- c()
 
-# get list of .csvs geocoded above w foreach
-filenames <- paste(outdata_dir, list.files(outdata_dir, pattern='.csv'), sep='/')
+# example of reading url 
+system.time({
+  for (i in (1:nrow(redcross_homefire_cases))) {
+    if(is.na(redcross_homefire_cases$esri_latitude_x[i])!=TRUE) {
+      urls[i] <- paste0("http://www.broadbandmap.gov/broadbandmap/census/tract?latitude=", 
+                        redcross_homefire_cases$esri_latitude_x[i],
+                        "&longitude=",
+                        redcross_homefire_cases$esri_longitude_x[i],
+                        "&format=xml"
+                        )
+      
+      doc <-  xmlTreeParse(urls[i])
+      tract <- xmlSApply(xmlRoot(doc)[[1]][[1]], xmlValue)['fips']
+      redcross_homefire_cases$tract[i] <- tract
+      if(i %% 10 == 0) cat(paste0(i, " records completely matched \n"))
+    }
+  }
+})
 
-# Read and append geocoded results
-redcross_disaster_cases_geo <- do.call("rbind", lapply(filenames, fread, header = F))
-names(redcross_disaster_cases_geo) <- c('id', 'Latitude', 'Longitude', 'block_group')
-
-# merge block groups onto the original data
-redcross_disaster_cases_m <- merge(redcross_disaster_cases, redcross_disaster_cases_geo[,.(id, block_group)], by='id', all.x=T, all.y=F)
-
-# writing merged data out to csv
-write.table(redcross_disaster_cases_m, row.names=F, sep=',', sprintf('2009-2014_RedCross_DisasterCases_sample_Geocode_bg.csv', 'Users/margaret/Desktop'))
+# redcross_homefire_cases
+redcross_homefire_cases <- data.frame(lapply(redcross_homefire_cases, as.character), stringsAsFactors=FALSE)
+redcross_homefire_cases <- redcross_homefire_cases[,c(1:39,43)]
+write.csv(redcross_homefire_cases, "2009-2014_RedCross_Homefire_Cases.csv")
 
