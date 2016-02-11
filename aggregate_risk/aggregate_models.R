@@ -12,12 +12,16 @@ dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tract_data_weighted_linear_
 dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
 dt3a <- fread('model_3a_casualty_given_fire/results/results_tract.csv')
 
+# functions used to normalize risk scores
+normalize <- function(x) (x - min(x, na.rm=T)) / (max(x, na.rm=T)- min(x, na.rm=T))
+balscale <- function(x, w_logit=0.75, w_normalized=0.25) plogis(scale(x))*w_logit + normalize(x)*w_normalized
+
 #######################################
 ## Processing results from Model 1.A ##
 #######################################
 
 dt1a[, tract_geoid:=paste0(state, cnty, tract)]
-dt1a[, risk_1a:=risk_1a*100]
+dt1a[, risk_1a:=balscale(risk_1a)*100]
 
 
 #######################################
@@ -28,7 +32,7 @@ setnames(dt1b, 'tractid', 'tract_geoid')
 dt1b[nchar(tract_geoid)==10, tract_geoid:=paste0('0', tract_geoid)] # adding leading 0 to tract_geoid
 
 # creating normalized risk score
-dt1b[, risk_1b := (weighted_linear_pred - min(weighted_linear_pred))/(max(weighted_linear_pred) - min(weighted_linear_pred))]
+dt1b[, risk_1b := balscale(weighted_linear_pred)*100]
 
 #######################################
 ## Processing results from Model 1.C ##
@@ -49,6 +53,8 @@ dt1c_tract <- dt1c[,.(
   blocks_per_tract=.N
 ), by=.(state, cnty, tract)]
 
+dt1c_tract[,risk_1c := balscale(risk_1c)*100]
+
 dt1c_tract[, tract_geoid:=paste0(state, cnty, tract)]
 
 
@@ -57,7 +63,7 @@ dt1c_tract[, tract_geoid:=paste0(state, cnty, tract)]
 #######################################
 
 # probabilities are low, so forcing normalization of scores to be between 0 and 1.  this could be improved later per feedback from ARC
-dt3a[, risk_3a := (risk_3a - min(risk_3a))/(max(risk_3a) - min(risk_3a))]
+dt3a[, risk_3a := balscale(risk_3a)*100]
 setnames(dt3a, 'geoid', 'tract_geoid')
 
 #######################################
