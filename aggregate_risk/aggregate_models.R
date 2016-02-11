@@ -4,9 +4,11 @@
 
 ## libraries
 library('data.table')
+library('bit64') # per warning in data.table from model_1b output
 library('readxl') 
 
 dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
+dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tract_data_weighted_linear_preds_upsampled.csv', colClasses=c('tractid'='character'))
 dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
 dt3a <- fread('model_3a_casualty_given_fire/results/results_tract.csv')
 
@@ -17,6 +19,16 @@ dt3a <- fread('model_3a_casualty_given_fire/results/results_tract.csv')
 dt1a[, tract_geoid:=paste0(state, cnty, tract)]
 dt1a[, risk_1a:=risk_1a*100]
 
+
+#######################################
+## Processing results from Model 1.B ##
+#######################################
+
+setnames(dt1b, 'tractid', 'tract_geoid')
+dt1b[nchar(tract_geoid)==10, tract_geoid:=paste0('0', tract_geoid)] # adding leading 0 to tract_geoid
+
+# creating normalized risk score
+dt1b[, risk_1b := (weighted_linear_pred - min(weighted_linear_pred))/(max(weighted_linear_pred) - min(weighted_linear_pred))]
 
 #######################################
 ## Processing results from Model 1.C ##
@@ -54,15 +66,17 @@ setnames(dt3a, 'geoid', 'tract_geoid')
 
 # setting key for merge
 setkey(dt1a, tract_geoid)
+setkey(dt1b, tract_geoid)
 setkey(dt1c_tract, tract_geoid)
 setkey(dt3a, tract_geoid)
 
 # merging risk scores together
-dt <- merge(dt1a[,.(tract_geoid, risk_1a)], dt1c_tract, all=T)
+dt <- merge(dt1a[,.(tract_geoid, risk_1a)], dt1b, all=T)
+dt <- merge(dt, dt1c_tract[,.(tract_geoid, risk_1c, cnty, state, tract, tract_pop)], all=T)
 dt <- merge(dt, dt3a[,.(tract_geoid, risk_3a)], all=T)
 
 # calculating aggregated risk score.  simple average now. will be built into function with ability to weight each indicator differently.
-dt$risk <- rowMeans(dt[,.(risk_1a, risk_1c, risk_3a)], na.rm=T)
+dt$risk <- rowMeans(dt[,.(risk_1a, risk_1b, risk_1c, risk_3a)], na.rm=T)
 
 #Creating County Average 
 dt[, risk_cnty:=mean(risk), by=.(state, cnty)]
@@ -91,5 +105,5 @@ file.remove('2015_Chapter_Alignment_Master_No_Contacts.xlsx') # remove file afte
 ## WRITING OUT RESULTS ################
 #######################################
 
-write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1c, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
+write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1b, risk_1c, risk_3a, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
