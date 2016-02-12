@@ -8,7 +8,7 @@ library('bit64') # per warning in data.table from model_1b output
 library('readxl') 
 
 dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
-dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tract_data_weighted_linear_preds_upsampled.csv', colClasses=c('tractid'='character'))
+dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tracts_74k_weighted_linear_preds_upsampled.csv', colClasses=c('tractid'='character'))
 dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
 dt3a <- fread('model_3a_casualty_given_fire/results/results_tract.csv')
 
@@ -22,7 +22,6 @@ balscale <- function(x, w_logit=0.75, w_normalized=0.25) plogis(scale(x))*w_logi
 
 dt1a[, tract_geoid:=paste0(state, cnty, tract)]
 dt1a[, risk_1a:=balscale(risk_1a)*100]
-
 
 #######################################
 ## Processing results from Model 1.B ##
