@@ -6,10 +6,13 @@
 library('data.table')
 library('bit64') # per warning in data.table from model_1b output
 library('readxl') 
+library('UScensus2010')
+#library('UScensus2010tract') # not sure if this is needed
 
 dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
 dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tracts_74k_weighted_linear_preds_upsampled.csv', colClasses=c('tractid'='character'))
 dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
+dt2a <- fread('model_2c_ind_RC_response/summary_output/fires_per_tract.csv', colClasses=c('x'='character'))
 dt3a <- fread('model_3a_casualty_given_fire/results/results_tract.csv')
 
 # functions used to normalize risk scores
@@ -55,6 +58,33 @@ dt1c_tract <- dt1c[,.(
 dt1c_tract[,risk_1c := balscale(risk_1c)*100]
 
 dt1c_tract[, tract_geoid:=paste0(state, cnty, tract)]
+
+
+#######################################
+## Processing results from Model 2.A ##
+#######################################
+
+dt2a[, V1:=NULL]
+setnames(dt2a, 'x', 'tract_geoid')
+
+# correcting geoid by getting back leading 0s
+dt2a[nchar(tract_geoid)=='10', tract_geoid:=paste0('0', tract_geoid)] 
+
+## getting population per tract
+dtpopL <- mapply(function(st) demographics(dem='P0010001', level='tract', state=st), st=c(state.abb, 'DC')) # 38 seconds
+dtpop <- rbindlist(lapply(dtpopL, function(x) as.data.table(x, keep.rownames=T)))
+setnames(dtpop, 'rn', 'tract_geoid')
+rm(dtpopL) # cleanup
+rm(list=grep('\\.tract10', ls(), value=T)) # clean up
+
+## creating indicator per capita
+dt2a <- merge(dt2a, dtpop, by='tract_geoid', all=T)
+dt2a[is.na(freq), freq:=0]
+dt2a[is.na(P0010001), P0010001:=0]
+dt2a[,firesPer1000:=freq/(P0010001+100)*1000]
+
+dt2a[,firesPer1000_scaled:=firesPer1000*log(P0010001)] # 
+dt2a[,risk_2a:=balscale(firesPer1000_scaled)]  ## why is this not working?
 
 
 #######################################
