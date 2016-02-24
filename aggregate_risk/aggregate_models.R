@@ -51,7 +51,6 @@ dt1c[,block:=substr(bg_geoid, 12,12)]
 ## calculating census tract-level risk.
 dt1c_tract <- dt1c[,.(
   risk_1c=mean(smoke_alarm_risk)*100,
-  tract_pop=sum(bg_pop),
   blocks_per_tract=.N
 ), by=.(state, cnty, tract)]
 
@@ -77,15 +76,15 @@ setnames(dtpop, 'rn', 'tract_geoid')
 rm(dtpopL) # cleanup
 rm(list=grep('\\.tract10', ls(), value=T)) # clean up
 
-## creating indicator per capita
+## creating indicator for RC responses per 1000 people.
+# downweghting tracts with smaller populations to stabilize ratio using log transform
 dt2a <- merge(dt2a, dtpop, by='tract_geoid', all=T)
 dt2a[is.na(freq), freq:=0]
 dt2a[is.na(P0010001), P0010001:=0]
 dt2a[,firesPer1000:=freq/(P0010001+100)*1000]
 
-dt2a[,firesPer1000_scaled:=firesPer1000*log(P0010001)] # 
-dt2a[,risk_2a:=balscale(firesPer1000_scaled)]  ## why is this not working?
-
+dt2a[,firesPer1000_scaled:=firesPer1000*log(P0010001+1)] # adjusting ratio by log of population 
+dt2a[,risk_2a:=balscale(firesPer1000_scaled)*100]  # creating final risk metric
 
 #######################################
 ## Processing results from Model 3.A ##
@@ -103,15 +102,17 @@ setnames(dt3a, 'geoid', 'tract_geoid')
 setkey(dt1a, tract_geoid)
 setkey(dt1b, tract_geoid)
 setkey(dt1c_tract, tract_geoid)
+setkey(dt2a, tract_geoid)
 setkey(dt3a, tract_geoid)
 
 # merging risk scores together
 dt <- merge(dt1a[,.(tract_geoid, risk_1a)], dt1b, all=T)
-dt <- merge(dt, dt1c_tract[,.(tract_geoid, risk_1c, cnty, state, tract, tract_pop)], all=T)
+dt <- merge(dt, dt1c_tract[,.(tract_geoid, risk_1c, cnty, state, tract)], all=T)
+dt <- merge(dt, dt2a[,.(tract_geoid, risk_2a, P0010001)], all=T)
 dt <- merge(dt, dt3a[,.(tract_geoid, risk_3a)], all=T)
 
 # calculating aggregated risk score.  simple average now. will be built into function with ability to weight each indicator differently.
-dt$risk <- rowMeans(dt[,.(risk_1a, risk_1b, risk_1c, risk_3a)], na.rm=T)
+dt$risk <- rowMeans(dt[, .(risk_1a, risk_1b, risk_1c, risk_2a, risk_3a)], na.rm=T)
 
 #Creating County Average 
 dt[, risk_cnty:=mean(risk), by=.(state, cnty)]
@@ -140,5 +141,5 @@ file.remove('2015_Chapter_Alignment_Master_No_Contacts.xlsx') # remove file afte
 ## WRITING OUT RESULTS ################
 #######################################
 
-write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1b, risk_1c, risk_3a, tract_pop)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
+write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1b, risk_1c, risk_2a, risk_3a)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
