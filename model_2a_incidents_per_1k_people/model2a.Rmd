@@ -147,6 +147,20 @@ states_coverage = merge(states_coverage, states_fips)
 write.csv(states_coverage, file = 'results/states_coverage.csv')
 ```
 
+### Discussion on NFIRS coverage
+
+NFIRS didn't cover all fire departments. 69 percent of U.S. fire
+departments reported fire incidents to NFIRS in 2011. Page 4 of [this document](https://www.usfa.fema.gov/downloads/pdf/statistics/data_sources_methodology.pdf) have a detailed table of the percentage of fire departments report to NFIRS for each state.
+
+Ideally we would want to adjust this coverage bias. However the data available are very limited:
+
+1. There is no existing complete fire department list. The National Fire Department
+Census established by USFA only included 26,500 fire departments, 88 percent of the estimated number of U.S. fire departments. 
+2. NFIRS don't have an up to date list of reporting fire departments either. There is a fire department file in NFIRS cd rom but it is outdated, some fire department even no longer exist.
+3. For our project goal of protecting more homes, we better estimate NFIRS coverage by protected population instead of fire department count. The population protected by one fire department could vary a lot.
+4. I believe counting one census tract as covered by NFIRS if there is ever reported incident in that census tract is the best estimate we can get for now. And I'm using all incidents reported to NFIRS (not limited in structure fire or fire incidents) and all reports across 2009 ~ 2013, so the coverage should be pretty complete. It is probably optimistic, but comparing the reporting fire department ratio with the covered population ratio in each state showed good correlation.
+5. The fire incident per 1000 population from Red Cross diaster response data is roughly correlated to our indicator from NFIRS data.
+
 ## Visualization for Maryland from 2009 to 2013, CA 2013:
 (Please do not change the Visualization folder since these files below rely on the absolute file path)
 
