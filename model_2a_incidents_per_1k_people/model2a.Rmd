@@ -27,7 +27,7 @@ For each tract, calculate
 - all structured fire incidents, this is the best approximate we can get for home fires.
 - normalize fire incidents counts by tract population. Tracts with zero or less than 100 population were ignored, which could create unproportionate value. These places could be parks with small population and many fire incidents, but the inherent fire risk for each home are not necessarily significantly larger than other places.
 
-Data file loaded for disk(for every year in 2009 ~ 2013):
+Data file loaded from disk(for every year in 2009 ~ 2013):
 
     2013_formated_addresses.Rdata   NFIRS incident address formated. Project google drive folder have csv version.
     2013_geocoded_addresses.Rdata   NFIRS incident address geocoded. Project google drive folder have csv version.
@@ -96,7 +96,7 @@ for(year in 2009:2013){
 ### NFIRS coverage estimate
 [census tract data](https://www.census.gov/geo/maps-data/data/tract_rel_layout.html)
 
-    STATE10  	2010 State FIPS Code
+    STATE10   2010 State FIPS Code
     TRACT10   2010 Tract Code
     GEOID10   Concatenation of state, county and tract for 2010 Census Tracts 
     POP10     2010 Population of the 2010 Tract
@@ -140,39 +140,34 @@ write.csv(states_coverage, file = 'results/states_coverage.csv')
 ```
 
 ## Visualization for Maryland from 2009 to 2013, CA 2013:
+(Please do not change the Visualization folder since these files below rely on the absolute file path)
 
 2009 Maryland
-
 ![2009 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2009_MD_fire_per_1k.png)
 
 [2009 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2009_MD.html)
 
 2010 Maryland
-
 ![2010 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2010_MD_fire_per_1k.png)
 
 [2010 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2010_MD.html)
 
 2011 Maryland
-
 ![2011 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2011_MD_fire_per_1k.png)
 
 [2011 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2011_MD.html)
 
 2012 Maryland
-
 ![2012 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2012_MD_fire_per_1k.png)
 
 [2012 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2012_MD.html)
 
 2013 Maryland
-
 ![2013 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_MD_fire_per_1k.png)
 
 [2013 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_MD.html)
 
 2013 California
-
 ![2013 California](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_CA_fire_per_1k.png)
 
 [2013 California in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_CA.html)
