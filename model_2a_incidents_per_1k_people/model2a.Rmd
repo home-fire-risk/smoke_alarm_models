@@ -35,6 +35,10 @@ Data file loaded from disk(for every year in 2009 ~ 2013):
     2013_fireincident.rds           NFIRS original data, loaded as R data.table, saved as R object.
     Tract_2010Census_DP1.dbf        [2010 Census TIGER/Line Shapefiles with Demographic Profile 1](http://www.census.gov/geo/maps-data/data/tiger-data.html)
 
+Result from code:
+
+    2013_tract_building_fire_per_1k.csv   Structured fire incidents count for each census tract, normalized by population
+
 ```{r # of incidents per 1000 people within a region}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(data.table, foreign, rgdal, rgeos, maptools)
@@ -100,6 +104,10 @@ for(year in 2009:2013){
     TRACT10   2010 Tract Code
     GEOID10   Concatenation of state, county and tract for 2010 Census Tracts 
     POP10     2010 Population of the 2010 Tract
+
+Result from code:
+  
+  states_coverage.csv   The ratio of NFIRS covered census tract population for each state
     
 ```{r NFIRS coverage estimate}
 if (!require("pacman")) install.packages("pacman")
