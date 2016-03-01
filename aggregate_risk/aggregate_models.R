@@ -9,7 +9,7 @@ library('readxl')
 library('UScensus2010')
 #library('UScensus2010tract') # not sure if this is needed
 
-dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') # still working creating this scores
+dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') 
 dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tracts_74k_weighted_linear_preds_upsampled.csv', colClasses=c('tractid'='character'))
 dt1c <- fread('model_1c_enigma_ahs_smokealarm/results/smoke-alarm-risk-scores.csv')
 dt2c <- fread('model_2c_ind_RC_response/summary_output/fires_per_tract.csv', colClasses=c('x'='character'))
@@ -73,19 +73,30 @@ dt2a <- merge(dt2a, dt2a_2011[,.(tractid, N)], by='tractid', all=T)
 dt2a <- merge(dt2a, dt2a_2012[,.(tractid, N)], by='tractid', all=T, suffixes=c('_2011', '_2012'))
 dt2a <- merge(dt2a, dt2a_2013[,.(tractid, N)], by='tractid', all=T)
 setnames(dt2a, 'N', 'N_2013')
-
 setnames(dt2a, 'tractid', 'tract_geoid')
 
-# setting NAs to 0
+## getting complete list of census tracts.  needed to fill in zeros
+dt2a <- merge(dt2a, dt1c_tract[, .(tract_geoid, blocks_per_tract)], by='tract_geoid', all=T) 
+
+## getting population per tract
+dtpopL <- mapply(function(st) demographics(dem='P0010001', level='tract', state=st), st=c(state.abb, 'DC')) # 38 seconds
+dtpop <- rbindlist(lapply(dtpopL, function(x) as.data.table(x, keep.rownames=T)))
+setnames(dtpop, 'rn', 'tract_geoid')
+rm(dtpopL) # cleanup
+rm(list=grep('\\.tract10', ls(), value=T)) # clean up
+
+# setting fire NAs to 0
 for(y in paste0('N_', 2009:2013)) set(dt2a, i=dt2a[,which(is.na(get(y)))], j=y, value=0) 
-dt2a[is.na(population), population:=0] 
 dt2a[, N := N_2009 + N_2010 + N_2011 + N_2012 + N_2013] # total number of fires over 2009-2013
 
+# filling in population where missing
+dt2a <- merge(dt2a, dtpop, by='tract_geoid', all=T)
+dt2a[is.na(population), population:=as.integer(P0010001)]
+dt2a[is.na(population), population:=0]
 dt2a[,firesPer1000:=N/(population+1)*1000] # stabilizing denominator
 dt2a[population>200, risk_2a:=balscale(firesPer1000)*100] # risk metric.  subsetting by population > 200 is important to remove outliers from scaling.
 
 rm(list=paste0('dt2a_', 2009:2013)) # cleaning up
-
 
 #######################################
 ## Processing results from Model 2.C ##
@@ -96,13 +107,6 @@ setnames(dt2c, 'x', 'tract_geoid')
 
 # correcting geoid by getting back leading 0s
 dt2c[nchar(tract_geoid)=='10', tract_geoid:=paste0('0', tract_geoid)] 
-
-## getting population per tract
-dtpopL <- mapply(function(st) demographics(dem='P0010001', level='tract', state=st), st=c(state.abb, 'DC')) # 38 seconds
-dtpop <- rbindlist(lapply(dtpopL, function(x) as.data.table(x, keep.rownames=T)))
-setnames(dtpop, 'rn', 'tract_geoid')
-rm(dtpopL) # cleanup
-rm(list=grep('\\.tract10', ls(), value=T)) # clean up
 
 ## creating indicator for RC responses per 1000 people.
 # downweghting tracts with smaller populations to stabilize ratio using log transform
