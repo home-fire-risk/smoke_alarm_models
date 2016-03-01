@@ -106,8 +106,8 @@ for(year in 2009:2013){
     POP10     2010 Population of the 2010 Tract
 
 Result from code:
-  
-  states_coverage.csv   The ratio of NFIRS covered census tract population for each state
+
+    states_coverage.csv   The ratio of NFIRS covered census tract population for each state
     
 ```{r NFIRS coverage estimate}
 if (!require("pacman")) install.packages("pacman")
