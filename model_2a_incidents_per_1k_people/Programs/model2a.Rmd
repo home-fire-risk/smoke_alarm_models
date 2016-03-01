@@ -1,0 +1,166 @@
+---
+title: "Model 2a fire per 1k"
+author: "Xianghui Dong"
+date: "2016年2月29日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Target variable 2a: # of incidents per 1000 people within a region
+
+- [github issue](https://github.com/home-fire-risk/smoke_alarm_models/issues/22)
+- [model document](https://docs.google.com/document/d/1oJN-QwLVqFHOvrRNtW2KEAkNZ-PuFiqTwa8y3iXx1Sg/edit)
+
+2) Which areas are in most danger of having fires
+Measure 1
+- indicator: # of incidents per 1000 people within a region
+- challenge: how to deal with regions where fire departments don’t report data
+- inherent bias in coverage of NFIRS (ok for now).
+- use state coverage to show confidence in estimates from NFIRS
+- data source: NFIRS
+
+By region we are refering census tract now. 
+For each tract, calculate
+- all structured fire incidents, this is the best approximate we can get for home fires.
+- normalize fire incidents counts by tract population. Tracts with zero or less than 100 population were ignored, which could create unproportionate value. These places could be parks with small population and many fire incidents, but the inherent fire risk for each home are not necessarily significantly larger than other places.
+
+Data file loaded for disk(for every year in 2009 ~ 2013):
+2013_formated_addresses.Rdata   NFIRS incident address formated. Project google drive folder have csv version.
+2013_geocoded_addresses.Rdata   NFIRS incident address geocoded. Project google drive folder have csv version.
+2013_basicincident.rds          NFIRS original data, loaded as R data.table, saved as R object.
+2013_fireincident.rds           NFIRS original data, loaded as R data.table, saved as R object.
+Tract_2010Census_DP1.dbf        [2010 Census TIGER/Line Shapefiles with Demographic Profile 1](http://www.census.gov/geo/maps-data/data/tiger-data.html)
+
+```{r # of incidents per 1000 people within a region}
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(data.table, foreign, rgdal, rgeos, maptools)
+# file path
+project_data = 'data/'
+external_data = 'e:/data/'
+
+structure_fire_per_1k = function(data_year){
+  # for testing function interactively
+  # data_year = '2013'
+  # ---- read original data, geocoding result ----
+  load(paste0(project_data, 'address/', data_year, '_formated_addresses.Rdata')) # variable name: address, 21 columns
+  load(paste0(project_data, 'address/', data_year, '_geocoded_addresses.Rdata')) # variable name: geocoded_address, 13 columns for 2012
+  # setkey(incident_address_2013, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+  table(address$address_type)
+  # load basic and fire incident file of data_year, get incident type, link to row_seq, get location
+  basic_incident = readRDS(paste0(external_data, 'NFIRS/', data_year, 'basicincident.rds'))
+  fire_incident = readRDS(paste0(external_data, 'NFIRS/', data_year, 'fireincident.rds'))
+  # calculate variable with structured fire, but estimate coverage with all incidents.
+  tracts_covered = unique(geocoded_address[, tractid])
+  # needed for estimating NFIRS coverage.
+  saveRDS(tracts_covered, file = paste0('results/', data_year, '_tracts_covered.rds'))
+  # 2013: basic - 2,003,907 fire - 554,671 building_fire - 259,732
+  building_fire = fire_incident[basic_incident[grep('111', INC_TYPE)]]
+  # ---- pick target variable to plot ----
+  # strucutured fire version
+  setkey(address, STATE, FDID, INC_DATE, INC_NO, EXP_NO)
+  # some address have empty STATE, although the address have stateid, the NA caused problem in left join? though they will dissappear when joined again by row_seq
+  building_fire_address = address[basic_incident[grep('111', INC_TYPE)]]
+  setkey(building_fire_address, row_seq)
+  building_fire_address_geocoded = geocoded_address[building_fire_address][!is.na(row_seq)]
+  by_tract = building_fire_address_geocoded[, .N, by = tractid][!is.na(tractid)]
+  setkey(by_tract, N)
+  saveRDS(by_tract, file = paste0('results/', data_year, '_building_fire_per_1k.rds'))
+  # by population etc
+  tract_census_2010 = data.table(read.dbf(
+    paste0(external_data, "TIGER/TIGERLineWithData_tracts/Tract_2010Census_DP1.dbf"), as.is = TRUE))
+  setkey(by_tract, tractid)
+  setkey(tract_census_2010, GEOID10)
+  setnames(tract_census_2010, 'DP0010001', 'population')
+  tract_census_selected = merge(by_tract, tract_census_2010, by.x = 'tractid', by.y = 'GEOID10' )
+  tract_census_selected[, fire_per_1000 := (N/population) * 1000]
+  tract_census_selected[, id := paste0('1400000US', tractid)]
+  # Some places have big area, small population and some fires, then the factor is abnormally large. 
+  View(tract_census_selected[, .(tractid, N, population,fire_per_1000)])
+  # zero population, and population < 50, created inf and abnormal large number
+  tract_census_selected_normal_population = tract_census_selected[population > 100, 
+                                                                  .(tractid, id, N, population,fire_per_1000)]
+  # needed for map
+  saveRDS(tract_census_selected_normal_population, file = paste0('results/', data_year, '_tract_population_fire.rds'))
+  write.csv(tract_census_selected_normal_population, file = paste0('results/', data_year, '_tract_building_fire_per_1k.csv'))
+}
+for(year in 2009:2013){
+  structure_fire_per_1k(year)
+}
+
+```
+
+### NFIRS coverage estimate
+[census tract data](https://www.census.gov/geo/maps-data/data/tract_rel_layout.html)
+
+    STATE10  	2010 State FIPS Code
+    TRACT10    	2010 Tract Code
+    GEOID10   Concatenation of state, county and tract for 2010 Census Tracts 
+    POP10   2010 Population of the 2010 Tract
+    
+```{r NFIRS coverage estimate}
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(data.table)
+project_data = 'data/'
+external_data = 'e:/data/'
+# combined version
+tracts_covered_all_years = vector()
+for(year in 2009:2013){
+  tracts_covered_all_years = c(tracts_covered_all_years, 
+                               readRDS(paste0('results/', data_year, '_tracts_covered.rds')))
+}
+tracts_covered_all_years_unique = unique(tracts_covered_all_years)
+# for each state, calculate all tract population sum, and covered tract population sum.
+tracts_census_national = fread(paste0(external_data, 'TIGER/us2010trf.txt'), 
+                               colClasses=list(character=c('STATE10', 'GEOID10')))
+# tracts_census_national_selected = tracts_census_national[, .(STATE10, GEOID10, POP10)]
+setkey(tracts_census_national, GEOID10)
+tracts_census_national = unique(tracts_census_national)
+states_population = tracts_census_national[, sum(POP10), by = STATE10]
+setnames(states_population, 'V1', 'total_population')
+# 1 less because of the empty one
+covered_tracts = tracts_census_national[GEOID10 %in% tracts_covered_all_years_unique,]
+states_population_covered = covered_tracts[, sum(POP10), by = STATE10]
+setnames(states_population_covered, 'V1', 'covered_population')
+setkey(states_population, STATE10)
+setkey(states_population_covered, STATE10)
+states_coverage = merge(states_population, states_population_covered)
+states_coverage[, coverage := covered_population / total_population]
+states_county_fips = fread(paste0(external_data, 'TIGER/national_county.txt'),
+                    colClasses=list(character=c('STATEFP', 'COUNTYFP')))
+setkey(states_county_fips, STATEFP)
+states_fips = unique(states_county_fips)[, .(STATE, STATEFP)]
+setnames(states_fips,'STATEFP', 'STATE10')
+setkey(states_fips, STATE10)
+states_coverage = merge(states_coverage, states_fips)
+write.csv(states_coverage, file = 'results/states_coverage.csv')
+```
+
+## Visualization for Maryland from 2009 to 2013, CA 2013:
+
+![2009 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2009_MD_fire_per_1k.png)
+
+[2009 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2009_MD.html)
+
+![2010 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2010_MD_fire_per_1k.png)
+
+[2010 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2010_MD.html)
+
+![2011 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2011_MD_fire_per_1k.png)
+
+[2011 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2011_MD.html)
+
+
+![2012 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2012_MD_fire_per_1k.png)
+
+[2012 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2012_MD.html)
+
+![2013 Maryland](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_MD_fire_per_1k.png)
+
+[2013 Maryland in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_MD.html)
+
+![2013 California](https://raw.githubusercontent.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_CA_fire_per_1k.png)
+
+[2013 California in interactive map](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_2a_incidents_per_1k_people/Visualization/2013_CA.html)
