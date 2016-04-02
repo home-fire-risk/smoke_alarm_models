@@ -7,7 +7,8 @@ library('data.table')
 library('bit64') # per warning in data.table from model_1b output
 library('readxl') 
 library('UScensus2010')
-#library('UScensus2010tract') # not sure if this is needed
+# library('UScensus2010tract') 
+# install.tract("osx") # need to run this if running for first time
 
 dt1a <- fread('model_1a_RC_homevisit/results/smoke-alarm-risk-scores.csv') 
 dt1b <- fread('model_1b_nfirs_smokealarm_pres/Output/tracts_74k_weighted_linear_preds_upsampled.csv', colClasses=c('tractid'='character'))
@@ -175,5 +176,9 @@ file.remove('2015_Chapter_Alignment_Master_No_Contacts.xlsx') # remove file afte
 ## WRITING OUT RESULTS ################
 #######################################
 
-write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1b, risk_1c, risk_2a, risk_2c, risk_3a)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
+dt[, risk1_agg := (risk_1a + risk_1b + risk_1c)/3]
+dt[, risk2_agg := (risk_2a + risk_2c)/2]
+dt[, risk3_agg := risk3_a]
+
+write.table(dt[,.(state, cnty, tract, tract_geoid, region_code, region_name, chapter_code, chapter_name, county_name_long, risk_cnty, risk, risk_1a, risk_1b, risk_1c, risk_2a, risk_2c, risk_3a, risk_1agg, risk2_agg, risk_3agg)], file='aggregate_risk/data/risk_tract.csv', sep=',', row.names=F)
 
