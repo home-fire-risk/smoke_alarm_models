@@ -9,7 +9,7 @@ The target variable created according to [model document](https://docs.google.co
 	all fire incidents in a region(tract), how many didn't have smoke detectors? 
 
 
-- AlarmPresenceNFIRS.html 
+- AlarmPresenceNFIRS.html [Rendered html link](https://cdn.rawgit.com/home-fire-risk/smoke_alarm_models/master/model_1b_nfirs_smokealarm_pres/AlarmPresenceNFIRS.html) 
 	My previous analysis of smoke alarm presence information in NFIRS data
 - model_1b.Rmd
 	R code for calculating the variables. It 
